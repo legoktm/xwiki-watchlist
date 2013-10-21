@@ -13,24 +13,34 @@ function makeCORSRequest( wikiapi, params, callback ) {
 	} );
 }
 
-function getWatchlist() {
-	var url, params, cur;
-	url = 'https://en.wikipedia.org/w/api.php';
+function getWatchlist( wiki ) {
+	var url, params, cur, realData;
+	url = 'https://' + wiki + '/w/api.php';
 	params = {
 		action: 'query',
 		list: 'watchlist',
 		wlprop: 'title|ids|sizes|timestamp|user|parsedcomment',
-		wltype: 'edit'
+		wltype: 'edit',
+		wllimit: '100'
 	};
 	makeCORSRequest( url, params, function ( data ) {
-		outputList( data );
-		cur = mw.config.get('wgWatchlist');
+		realData = [];
+		$.each( data.query.watchlist, function( i, val ) {
+			val.url = wiki;
+			realData.push( val );
+		} );
+		cur = window.wgWatchlist;
 		if ( cur == undefined ) {
-			cur = {};
+			cur = [];
 		}
-		$.merge( cur, {'enwiki': data} );
-		mw.config.set('wgWatchlist', cur );
-
+		cur = cur.concat(realData);
+		window.wgWatchlist = cur;
+		function automagicalSort(a, b) {
+			// Reverse sort by time
+			return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+		}
+		cur.sort(automagicalSort);
+		outputList( cur );
 	} )
 }
 
@@ -39,19 +49,19 @@ function makeRow( stuff ) {
 		.append('( ')
 		.append(
 			$('<a></a>')
-				.attr('href', 'https://en.wikipedia.org/?diff=' + stuff.revid)
+				.attr('href', 'https://' + stuff.url + '/?diff=' + stuff.revid)
 				.text('diff')
 		)
 		.append( ' | ')
 		.append(
 			$('<a></a>')
-				.attr('href', 'https://en.wikipedia.org/?action=history&curid=' + stuff.pageid)
+				.attr('href', 'https://' + stuff.url + '/?action=history&curid=' + stuff.pageid)
 				.text('hist')
 		)
 		.append( ' ) .. ' )
 		.append(
 			$('<a></a>')
-				.attr('href', 'https://en.wikipedia.org/wiki/' + encodeURIComponent( stuff.title ) )
+				.attr('href', 'https://' + stuff.url + '/wiki/' + encodeURIComponent( stuff.title ) )
 				.text( stuff.title )
 		)
 		// FIXME: make timestamp pretty
@@ -59,22 +69,25 @@ function makeRow( stuff ) {
 		.append( '; ' + stuff.timestamp + ' .. ')
 		.append(
 			$('<a></a>')
-				.attr('href', 'https://en.wikipedia.org/wiki/User:' + encodeURIComponent( stuff.user ) )
+				.attr('href', 'https://' + stuff.url + '/wiki/User:' + encodeURIComponent( stuff.user ) )
 				.text( stuff.user )
 		)
+		.append( ' ' )
 		.append(
 			$('<span></span>')
 				.addClass('editsummary')
-				.html( stuff.parsedcomment )
+				.html( stuff.parsedcomment.replace(new RegExp('"/wiki/', 'g'), '"//' + stuff.url + '/wiki/') )
 		);
 }
 
 function outputList( queryresult ) {
 	var ul = $('<ul></ul>');
-	$.each( queryresult.query.watchlist, function( index, value ) {
+	$.each( queryresult, function( index, value ) {
 		ul.append( makeRow( value ) );
 	} );
 	var thing = $('#thing');
 	thing.text('');
 	thing.append( ul );
 }
+
+//getWatchlist( 'meta.wikimedia.org' );
