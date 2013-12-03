@@ -1,7 +1,6 @@
-
 function makeCORSRequest( wikiapi, params, callback ) {
 	params.format = 'json';
-	params.origin = 'https://www.wikidata.org';
+	params.origin = 'https://meta.wikimedia.org';
 	$.ajax( {
 		'url': wikiapi,
 		'data': params,
